@@ -3,6 +3,10 @@
 #include <Python.h>
 #include <map>
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #define epicsAlarmGLOBAL
 #include <alarm.h>
 #undef epicsAlarmGLOBAL
@@ -36,7 +40,7 @@ static std::map<struct ca_client_context*, context_callback> CONTEXTS;
     #define PyInt_FromSsize_t PyLong_FromSsize_t
     #define PyString_Check PyUnicode_Check
     #define PyString_FromString PyUnicode_FromString
-    #define PyString_AsString PyUnicode_AsUTF8
+    #define PyString_AsString(unicode) PyUnicode_AsUTF8AndSize(unicode, NULL)
     #define CAPSULE_BUILD(ptr,name, destr) PyCapsule_New(ptr, name, destr)
     #define CAPSULE_CHECK(obj) PyCapsule_CheckExact(obj)
     #define CAPSULE_EXTRACT(obj,name) PyCapsule_GetPointer(obj, name)
@@ -49,7 +53,7 @@ static std::map<struct ca_client_context*, context_callback> CONTEXTS;
     #define CAPSULE_EXTRACT(obj,name) PyCObject_AsVoidPtr(obj)
 #endif
 
-static PyObject *Py_ca_create_context(PyObject *self, PyObject *args);
+static PyObject *Py_ca_create_context(PyObject *self, PyObject *args, PyObject *kws);
 static PyObject *Py_ca_destroy_context(PyObject *self, PyObject *args);
 static PyObject *Py_ca_attach_context(PyObject *self, PyObject *args);
 static PyObject *Py_ca_detach_context(PyObject *self, PyObject *args);
@@ -137,11 +141,22 @@ static void add_IntEnum(PyObject * pModule, const char *buffer)
     PyDict_Update(pDict, pGlobalDict);
     PyDict_Update(pDict, pModuleDict);
 
-    PyObject * pTemp = PyRun_String(buffer, Py_file_input, pDict, pModuleDict);
-    if (pTemp == NULL)
+    #if PY_MAJOR_VERSION >= 3
+    PyObject * pCode = Py_CompileString(buffer, "<string>", Py_file_input);
+    #else
+    PyCodeObject * pCode = (PyCodeObject*)Py_CompileString(buffer, "<string>", Py_file_input);
+    #endif
+
+    if (pCode == NULL) {
         PyErr_Clear();
-    else
-        Py_XDECREF(pTemp);
+    } else {
+        PyObject * pTemp = PyEval_EvalCode(pCode, pDict, pModuleDict);
+        if (pTemp == NULL)
+            PyErr_Clear();
+        else
+            Py_XDECREF(pTemp);
+        Py_XDECREF(pCode);
+    }
 
     Py_XDECREF(pDict);
 }
@@ -187,7 +202,11 @@ static void DBRValue_dealloc(DBRValueObject* self)
     if (self->dbr)
         free(self->dbr);
 
+#ifdef Py_LIMITED_API
+    ((freefunc)PyType_GetSlot(Py_TYPE((PyObject*)self), Py_tp_free))(self);
+#else
     Py_TYPE(self)->tp_free((PyObject*)self);
+#endif
 }
 
 static PyObject *DBRValue_get(DBRValueObject *self)
@@ -306,7 +325,7 @@ static PyObject *DBRValue_New(chtype dbrtype, unsigned long count, void *dbr, bo
 /*  Method Table  */
 static PyMethodDef CA_Methods[] = {
     /* CA context */
-    {"create_context",      Py_ca_create_context,   METH_VARARGS, "Create a CA context"},
+    {"create_context", (PyCFunction)Py_ca_create_context,   METH_VARARGS|METH_KEYWORDS, "Create a CA context"},
     {"destroy_context",     Py_ca_destroy_context,  METH_VARARGS, "Destroy a CA context"},
     {"attach_context",      Py_ca_attach_context,   METH_VARARGS, "Detach a CA context"},
     {"detach_context",      Py_ca_detach_context,   METH_VARARGS, "Attach to a CA context"},
@@ -902,10 +921,11 @@ static PyObject *IntToIntEnum(const char *type, long value)
  *                    CA Context                       *
  *******************************************************/
 
-static PyObject *Py_ca_create_context(PyObject *self, PyObject *args)
+static PyObject *Py_ca_create_context(PyObject *self, PyObject *args, PyObject *kws)
 {
     int preemptive_callback = 1;
-    if(!PyArg_ParseTuple(args, "|i", &preemptive_callback))
+    const char *kwlist[] = {"preemptive_callback",  NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kws, "|i", (char **)kwlist, &preemptive_callback))
         return NULL;
 
     int status;
@@ -2633,7 +2653,7 @@ PyObject * CBufferToPythonDict(chtype type,
         unsigned long nstr=cval->no_str,i;
         PyObject *ptup=PyTuple_New(nstr);
         for(i=0; i< nstr;i++){
-            PyTuple_SET_ITEM(ptup,i,CharToPyStringOrBytes((*strs)[i]));
+            PyTuple_SetItem(ptup,i,CharToPyStringOrBytes((*strs)[i]));
         }
         arglist=Py_BuildValue("{s:O,s:N,s:N,s:i,s:O}",
                 "value",    value,
@@ -2751,7 +2771,7 @@ PyObject * CBufferToPythonDict(chtype type,
         unsigned long nstr=cval->no_str,i;
         PyObject *ptup=PyTuple_New(nstr);
         for(i=0; i< nstr;i++){
-            PyTuple_SET_ITEM(ptup,i,CharToPyStringOrBytes((*strs)[i]));
+            PyTuple_SetItem(ptup,i,CharToPyStringOrBytes((*strs)[i]));
         }
         arglist=Py_BuildValue("{s:O,s:N,s:N,s:i,s:O}",
                 "value",    value,
