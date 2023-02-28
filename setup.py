@@ -24,11 +24,18 @@ def load_module(name, location):
         import imp
         module = imp.load_source(name, location)
     else:
-        import importlib
+        import importlib.util
         spec = importlib.util.spec_from_file_location(name, location)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
     return module
+
+# check wether all paths exist
+def paths_exist(paths):
+    for path in paths:
+        if not os.path.exists(path):
+            return False
+    return True
 
 build_ca_ext=True
 # define EPICS base path and host arch
@@ -50,7 +57,7 @@ if not EPICSBASE or not os.path.exists(EPICSBASE) or not HOSTARCH:
 
 
 def create_exension():
-    global EPICSBASE, HOSTARCH
+    global EPICSBASE, HOSTARCH, SHARED
     umacros = []
     macros = []
     cflags = []
@@ -102,17 +109,24 @@ def create_exension():
             CMPL = 'gcc'
     elif UNAME.lower() == "darwin":
         CMPL = 'clang'
-        HOSTARCH = 'darwin-x86'
         if not SHARED:
             extra_objects = [os.path.join(EPICSBASE, 'lib', HOSTARCH, 'lib%s.a' % lib) for lib in libraries]
-            libraries = []
+            if paths_exist(extra_objects):
+                libraries = []
+            else:
+                extra_objects = []
+                SHARED= True
     elif UNAME.lower() == "linux":
         CMPL = 'gcc'
         if not SHARED:
             extra_objects = [os.path.join(EPICSBASE, 'lib', HOSTARCH, 'lib%s.a' % lib) for lib in libraries]
-            libraries = ['rt']
-            if subprocess.call('nm %s | grep -q rl_' % os.path.join(EPICSBASE, 'lib', HOSTARCH, 'libCom.a'), shell=True) == 0:
-                libraries += ['readline']
+            if paths_exist(extra_objects):
+                libraries = ['rt']
+                if subprocess.call('nm %s | grep -q rl_' % os.path.join(EPICSBASE, 'lib', HOSTARCH, 'libCom.a'), shell=True) == 0:
+                    libraries += ['readline']
+            else:
+                extra_objects = []
+                SHARED = True
     else:
         print("Platform", UNAME, ARCH, " Not Supported")
         sys.exit(1)
