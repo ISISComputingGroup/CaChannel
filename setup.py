@@ -84,12 +84,12 @@ def create_exension():
                     dll_filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src', 'CaChannel', dll)
                     if not os.path.exists(dll_filepath) or not filecmp.cmp(dllpath, dll_filepath):
                         shutil.copy(dllpath, dll_filepath)
-            macros += [('_CRT_SECURE_NO_WARNINGS', 'None'), ('EPICS_CALL_DLL', '')]
+            macros += [('_CRT_SECURE_NO_WARNINGS', 'None'), ('EPICS_CALL_DLL', ''), ('EPICS_BUILD_DLL', ''), ('USE_TYPED_RSET', '')]
             if DEBUG:
                 cflags += ['/MDd', '/Od', '/RTCsu']
-            cflags += ['/Z7']
-            #cflags += ['/Od', '/RTCsu'] # use for release debugging
-            lflags += ['/DEBUG']
+            cflags += ['/Od', '/RTCsu'] # use for release debugging
+            cflags += ['/GR', '/Z7', '/Oy-']
+            lflags += ['/DEBUG', '/LTCG:OFF']
             CMPL = 'msvc'
         if HOSTARCH in ['win32-x86-static', 'windows-x64-static'] or static:
             libraries += ['ws2_32', 'user32', 'advapi32']

@@ -327,8 +327,8 @@ static PyMethodDef CA_Methods[] = {
     /* CA context */
     {"create_context", (PyCFunction)Py_ca_create_context,   METH_VARARGS|METH_KEYWORDS, "Create a CA context"},
     {"destroy_context",     Py_ca_destroy_context,  METH_VARARGS, "Destroy a CA context"},
-    {"attach_context",      Py_ca_attach_context,   METH_VARARGS, "Detach a CA context"},
-    {"detach_context",      Py_ca_detach_context,   METH_VARARGS, "Attach to a CA context"},
+    {"attach_context",      Py_ca_attach_context,   METH_VARARGS, "Attach to a CA context"},
+    {"detach_context",      Py_ca_detach_context,   METH_VARARGS, "Detach a CA context"},
     {"current_context",     Py_ca_current_context,  METH_VARARGS, "Get the current CA context"},
     {"show_context", (PyCFunction)Py_ca_show_context,     METH_VARARGS|METH_KEYWORDS, "Show the CA context information"},
     /* Channel creation */
@@ -1616,7 +1616,7 @@ static PyObject *Py_ca_add_exception_event(PyObject *self, PyObject *args)
 }
 
 static PyObject *pPrintfHandler = NULL;
-int printf_handler(const char *pFormat, va_list args)
+static int printf_handler(const char *pFormat, va_list args)
 {
     PyGILState_STATE gstate = PyGILState_Ensure();
 
