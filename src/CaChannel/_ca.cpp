@@ -1593,6 +1593,8 @@ static PyObject *Py_ca_add_exception_event(PyObject *self, PyObject *args)
     } else {
         pCallback = NULL;
     }
+    /* reference the user callback so that it will not be garbage collected */
+    Py_XINCREF(pCallback);
 
     int status;
     Py_BEGIN_ALLOW_THREADS
@@ -1607,9 +1609,9 @@ static PyObject *Py_ca_add_exception_event(PyObject *self, PyObject *args)
         PyObject *pOldCallback = CONTEXTS[pContext].pExceptionCallback;
         Py_XDECREF(pOldCallback);
 
-        /* reference the user callback so that it will not be garbage collected */
         CONTEXTS[pContext].pExceptionCallback = pCallback;
-        Py_XINCREF(pCallback);
+    } else {
+        Py_XDECREF(pCallback);
     }
 
     return IntToIntEnum("ECA", status);
