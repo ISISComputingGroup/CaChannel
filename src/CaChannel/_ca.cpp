@@ -2,6 +2,7 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <map>
+#include <stdexcept>
 
 #include <stdio.h>
 #include <stdlib.h>
