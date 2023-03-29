@@ -2,7 +2,6 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <map>
-#include <stdexcept>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -130,16 +129,6 @@ static PyObject *CBufferToPythonDict(chtype type, unsigned long count, const voi
 static void *setup_put(chanId chid, PyObject *pValue, PyObject *pType, PyObject *pCount,
                        chtype &dbrtype, unsigned long &count);
 
-static void checkExceptionCallback()
-{
-    ca_client_context *pContext = ca_current_context();
-    PyObject *pCallback = CONTEXTS[pContext].pExceptionCallback;
-    if (pCallback != NULL && !PyCallable_Check(pCallback))
-    {
-        throw std::runtime_error("checkExceptionCallback PyCallable_Check");
-    }
-}
-
 /********************************************
  *          Helper functions                *
  ********************************************/
@@ -171,7 +160,6 @@ static void add_IntEnum(PyObject * pModule, const char *buffer)
 
     Py_XDECREF(pDict);
 }
-
 
 static PyObject* CharToPyStringOrBytes(const char *buffer)
 {
@@ -935,7 +923,6 @@ static PyObject *IntToIntEnum(const char *type, long value)
 
 static PyObject *Py_ca_create_context(PyObject *self, PyObject *args, PyObject *kws)
 {
-    checkExceptionCallback();
     int preemptive_callback = 1;
     const char *kwlist[] = {"preemptive_callback",  NULL};
     if (!PyArg_ParseTupleAndKeywords(args, kws, "|i", (char **)kwlist, &preemptive_callback))
@@ -947,7 +934,6 @@ static PyObject *Py_ca_create_context(PyObject *self, PyObject *args, PyObject *
     status = ca_context_create(preemptive_callback ?
                 ca_enable_preemptive_callback : ca_disable_preemptive_callback);
     Py_END_ALLOW_THREADS
-    checkExceptionCallback();
 
     return IntToIntEnum("ECA", status);
 }
@@ -955,7 +941,6 @@ static PyObject *Py_ca_create_context(PyObject *self, PyObject *args, PyObject *
 static PyObject *Py_ca_destroy_context(PyObject *self, PyObject *args)
 {
     struct ca_client_context * pContext = NULL;
-    checkExceptionCallback();
     Py_BEGIN_ALLOW_THREADS
     pContext = ca_current_context();
     ca_context_destroy();
@@ -968,7 +953,6 @@ static PyObject *Py_ca_destroy_context(PyObject *self, PyObject *args)
         Py_XDECREF(it->second.pPrintfHandler);
         CONTEXTS.erase(it);
     }
-    checkExceptionCallback();
 
     Py_RETURN_NONE;
 }
@@ -976,7 +960,6 @@ static PyObject *Py_ca_destroy_context(PyObject *self, PyObject *args)
 static PyObject *Py_ca_attach_context(PyObject *self, PyObject *args)
 {
     PyObject *pObject;
-    checkExceptionCallback();
     if(!PyArg_ParseTuple(args, "O", &pObject))
         return NULL;
 
@@ -989,18 +972,15 @@ static PyObject *Py_ca_attach_context(PyObject *self, PyObject *args)
     Py_BEGIN_ALLOW_THREADS
     status = ca_attach_context(pContext);
     Py_END_ALLOW_THREADS
-    checkExceptionCallback();
 
     return IntToIntEnum("ECA", status);
 }
 
 static PyObject *Py_ca_detach_context(PyObject *self, PyObject *args)
 {
-    checkExceptionCallback();
     Py_BEGIN_ALLOW_THREADS
     ca_detach_context();
     Py_END_ALLOW_THREADS
-    checkExceptionCallback();
 
     Py_RETURN_NONE;
 }
@@ -1008,12 +988,10 @@ static PyObject *Py_ca_detach_context(PyObject *self, PyObject *args)
 static PyObject *Py_ca_current_context(PyObject *self, PyObject *args)
 {
     struct ca_client_context *pContext;
-    checkExceptionCallback();
     Py_BEGIN_ALLOW_THREADS
     pContext = ca_current_context();
     Py_END_ALLOW_THREADS
 
-    checkExceptionCallback();
     if (pContext == NULL)
         Py_RETURN_NONE;
     else
@@ -1024,7 +1002,6 @@ static PyObject *Py_ca_show_context(PyObject *self, PyObject *args, PyObject *kw
 {
     PyObject *pObject = Py_None;
     int level = 0;
-    checkExceptionCallback();
 
     const char *kwlist[] = {"context", "level",  NULL};
 
@@ -1043,7 +1020,6 @@ static PyObject *Py_ca_show_context(PyObject *self, PyObject *args, PyObject *kw
         ca_context_status(pContext, level);
         Py_END_ALLOW_THREADS
     }
-    checkExceptionCallback();
 
     Py_RETURN_NONE;
 }
@@ -1101,7 +1077,6 @@ static void connection_callback(struct connection_handler_args args)
 
 static PyObject *Py_ca_create_channel(PyObject *self, PyObject *args, PyObject *kws)
 {
-    checkExceptionCallback();
     char *pName;
     PyObject *pCallback = NULL;
     int priority = CA_PRIORITY_DEFAULT;
@@ -1122,7 +1097,6 @@ static PyObject *Py_ca_create_channel(PyObject *self, PyObject *args, PyObject *
     status = ca_create_channel(pName, pFunc, pData, priority, &chid);
     Py_END_ALLOW_THREADS
 
-    checkExceptionCallback();
     if (status == ECA_NORMAL) {
         return Py_BuildValue("NN", IntToIntEnum("ECA", status), CAPSULE_BUILD(chid, "chid", NULL));
     } else {
@@ -1135,7 +1109,6 @@ static PyObject *Py_ca_create_channel(PyObject *self, PyObject *args, PyObject *
 static PyObject *Py_ca_clear_channel(PyObject *self, PyObject *args)
 {
     PyObject *pChid;
-    checkExceptionCallback();
     if(!PyArg_ParseTuple(args, "O", &pChid))
         return NULL;
 
@@ -1153,7 +1126,6 @@ static PyObject *Py_ca_clear_channel(PyObject *self, PyObject *args)
     Py_END_ALLOW_THREADS
 
     delete pData;
-    checkExceptionCallback();
 
     return IntToIntEnum("ECA", status);
 }
@@ -1163,7 +1135,6 @@ static PyObject *Py_ca_change_connection_event(PyObject *self, PyObject *args)
 {
     PyObject *pChid;
     PyObject *pCallback = NULL;
-    checkExceptionCallback();
     if(!PyArg_ParseTuple(args, "O|O", &pChid, &pCallback))
         return NULL;
 
@@ -1197,7 +1168,6 @@ static PyObject *Py_ca_change_connection_event(PyObject *self, PyObject *args)
     Py_BEGIN_ALLOW_THREADS
     status = ca_change_connection_event(chid, pfunc);
     Py_END_ALLOW_THREADS
-    checkExceptionCallback();
 
     return IntToIntEnum("ECA", status);
 }
@@ -1214,7 +1184,6 @@ static void get_callback(struct event_handler_args args)
         return;
 
     PyGILState_STATE gstate = PyGILState_Ensure();
-    checkExceptionCallback();
 
     if (PyCallable_Check(pData->pCallback)) {
         PyObject *pChid = CAPSULE_BUILD(args.chid, "chid", NULL);
@@ -1242,14 +1211,12 @@ static void get_callback(struct event_handler_args args)
 
     delete pData;
 
-    checkExceptionCallback();
     PyGILState_Release(gstate);
 }
 
 static void event_callback(struct event_handler_args args)
 {
     PyGILState_STATE gstate = PyGILState_Ensure();
-    checkExceptionCallback();
 
     ChannelData *pData= (ChannelData *)args.usr;
 
@@ -1277,7 +1244,6 @@ static void event_callback(struct event_handler_args args)
         Py_XDECREF(pArgs);
     }
 
-    checkExceptionCallback();
     PyGILState_Release(gstate);
 }
 
@@ -1292,7 +1258,6 @@ static PyObject *Py_ca_get(PyObject *self, PyObject *args, PyObject *kws)
     PyObject *pCallback = Py_None;
     bool use_numpy = false;
     int status;
-    checkExceptionCallback();
 
     const char *kwlist[] = {"chid", "chtype", "count", "callback", "use_numpy", NULL};
 
@@ -1320,7 +1285,6 @@ static PyObject *Py_ca_get(PyObject *self, PyObject *args, PyObject *kws)
             return NULL;
         count = MIN(req_count, count);
     }
-    checkExceptionCallback();
     if (PyCallable_Check(pCallback)) {
         ChannelData *pData = new ChannelData(pCallback);
         pData->use_numpy = use_numpy;
@@ -1352,7 +1316,6 @@ static PyObject *Py_ca_get(PyObject *self, PyObject *args, PyObject *kws)
 static void put_callback(struct event_handler_args args)
 {
     PyGILState_STATE gstate = PyGILState_Ensure();
-    checkExceptionCallback();
 
     ChannelData *pData = (ChannelData *)args.usr;
 
@@ -1376,7 +1339,6 @@ static void put_callback(struct event_handler_args args)
     }
 
     delete pData;
-    checkExceptionCallback();
 
     PyGILState_Release(gstate);
 }
@@ -1393,7 +1355,6 @@ static PyObject *Py_ca_put(PyObject *self, PyObject *args, PyObject *kws)
     PyObject *pCallback = Py_None;
     void *pbuf = NULL;
     int status;
-    checkExceptionCallback();
 
     const char *kwlist[] = {"chid", "value", "chtype", "count", "callback", NULL};
 
@@ -1405,7 +1366,6 @@ static PyObject *Py_ca_put(PyObject *self, PyObject *args, PyObject *kws)
         return NULL;
 
     pbuf = setup_put(chid, pValue, pType, pCount, dbrtype, count);
-    checkExceptionCallback();
     if (pbuf == NULL) {
         if (PyErr_Occurred())
             return NULL;
@@ -1427,7 +1387,6 @@ static PyObject *Py_ca_put(PyObject *self, PyObject *args, PyObject *kws)
     }
 
     free(pbuf);
-    checkExceptionCallback();
 
     return IntToIntEnum("ECA", status);
 }
@@ -1445,7 +1404,6 @@ static PyObject *Py_ca_create_subscription(PyObject *self, PyObject *args, PyObj
     unsigned long mask = DBE_VALUE | DBE_ALARM;
     bool use_numpy = false;
     const char *kwlist[] = {"chid", "callback", "chtype", "count", "mask", "use_numpy", NULL};
-    checkExceptionCallback();
 
     if (!PyArg_ParseTupleAndKeywords(args, kws, "OO|OOOb", (char **)kwlist, &pChid,  &pCallback, &pType, &pCount, &pMask, &use_numpy))
         return NULL;
@@ -1486,7 +1444,6 @@ static PyObject *Py_ca_create_subscription(PyObject *self, PyObject *args, PyObj
     Py_BEGIN_ALLOW_THREADS
     status = ca_create_subscription(dbrtype, count, chid, mask, event_callback, pData, &eventID);
     Py_END_ALLOW_THREADS
-    checkExceptionCallback();
 
     if (status == ECA_NORMAL) {
         pData->eventID = eventID;
@@ -1501,7 +1458,6 @@ static PyObject *Py_ca_create_subscription(PyObject *self, PyObject *args, PyObj
 static PyObject *Py_ca_clear_subscription(PyObject *self, PyObject *args)
 {
     PyObject *pObject;
-    checkExceptionCallback();
     if(!PyArg_ParseTuple(args, "O", &pObject))
         return NULL;
 
@@ -1516,7 +1472,6 @@ static PyObject *Py_ca_clear_subscription(PyObject *self, PyObject *args)
     Py_END_ALLOW_THREADS
 
     delete pData;
-    checkExceptionCallback();
 
     return IntToIntEnum("ECA", status);
 }
@@ -1528,7 +1483,6 @@ static void access_rights_handler(struct access_rights_handler_args args)
         return;
 
     PyGILState_STATE gstate = PyGILState_Ensure();
-    checkExceptionCallback();
 
     if (PyCallable_Check(pData->pAccessEventCallback)) {
         PyObject *pArgs = Py_BuildValue(
@@ -1544,7 +1498,6 @@ static void access_rights_handler(struct access_rights_handler_args args)
         Py_XDECREF(ret);
         Py_XDECREF(pArgs);
     }
-    checkExceptionCallback();
 
     PyGILState_Release(gstate);
 }
@@ -1553,7 +1506,6 @@ static PyObject *Py_ca_replace_access_rights_event(PyObject *self, PyObject *arg
 {
     PyObject *pChid;
     PyObject *pCallback = NULL;
-    checkExceptionCallback();
     if(!PyArg_ParseTuple(args, "O|O", &pChid,  &pCallback))
         return NULL;
 
@@ -1586,7 +1538,6 @@ static PyObject *Py_ca_replace_access_rights_event(PyObject *self, PyObject *arg
     Py_BEGIN_ALLOW_THREADS
     status = ca_replace_access_rights_event(chid, handler);
     Py_END_ALLOW_THREADS
-    checkExceptionCallback();
 
     return IntToIntEnum("ECA", status);
 }
@@ -1662,7 +1613,6 @@ static PyObject *Py_ca_add_exception_event(PyObject *self, PyObject *args)
     } else {
         Py_XDECREF(pCallback);
     }
-    checkExceptionCallback();
 
     return IntToIntEnum("ECA", status);
 }
@@ -1688,7 +1638,6 @@ static int printf_handler(const char *pFormat, va_list args)
         Py_XDECREF(ret);
         Py_XDECREF(pArgs);
     }
-    checkExceptionCallback();
 
     PyGILState_Release(gstate);
 
@@ -1698,7 +1647,6 @@ static int printf_handler(const char *pFormat, va_list args)
 static PyObject *Py_ca_replace_printf_handler(PyObject *self, PyObject *args)
 {
     PyObject *pCallback = NULL;
-    checkExceptionCallback();
     if(!PyArg_ParseTuple(args, "|O", &pCallback))
         return NULL;
 
@@ -1719,7 +1667,6 @@ static PyObject *Py_ca_replace_printf_handler(PyObject *self, PyObject *args)
     Py_BEGIN_ALLOW_THREADS
     status = ca_replace_printf_handler(pFunc);
     Py_END_ALLOW_THREADS
-    checkExceptionCallback();
 
     return IntToIntEnum("ECA", status);
 }
@@ -1900,7 +1847,6 @@ static PyObject *Py_ca_pend(PyObject *self, PyObject *args)
 {
     double timeout;
     int early;
-    checkExceptionCallback();
     if(!PyArg_ParseTuple(args, "di", &timeout, &early))
         return NULL;
 
@@ -1909,7 +1855,6 @@ static PyObject *Py_ca_pend(PyObject *self, PyObject *args)
     Py_BEGIN_ALLOW_THREADS
     status = ca_pend(timeout, early);
     Py_END_ALLOW_THREADS
-    checkExceptionCallback();
 
     return IntToIntEnum("ECA", status);
 }
@@ -1918,11 +1863,9 @@ static PyObject *Py_ca_flush_io(PyObject *self, PyObject *args)
 {
     int status;
 
-    checkExceptionCallback();
     Py_BEGIN_ALLOW_THREADS
     status = ca_flush_io();
     Py_END_ALLOW_THREADS
-    checkExceptionCallback();
 
     return IntToIntEnum("ECA", status);
 }
@@ -1930,7 +1873,6 @@ static PyObject *Py_ca_flush_io(PyObject *self, PyObject *args)
 static PyObject *Py_ca_pend_io(PyObject *self, PyObject *args)
 {
     double timeout;
-    checkExceptionCallback();
     if(!PyArg_ParseTuple(args, "d", &timeout))
         return NULL;
 
@@ -1939,7 +1881,6 @@ static PyObject *Py_ca_pend_io(PyObject *self, PyObject *args)
     Py_BEGIN_ALLOW_THREADS
     status = ca_pend_io(timeout);
     Py_END_ALLOW_THREADS
-    checkExceptionCallback();
 
     return IntToIntEnum("ECA", status);
 }
@@ -1947,7 +1888,6 @@ static PyObject *Py_ca_pend_io(PyObject *self, PyObject *args)
 static PyObject *Py_ca_pend_event(PyObject *self, PyObject *args)
 {
     double timeout;
-    checkExceptionCallback();
     if(!PyArg_ParseTuple(args, "d", &timeout))
         return NULL;
 
@@ -1956,7 +1896,6 @@ static PyObject *Py_ca_pend_event(PyObject *self, PyObject *args)
     Py_BEGIN_ALLOW_THREADS
     status = ca_pend_event(timeout);
     Py_END_ALLOW_THREADS
-    checkExceptionCallback();
 
     return IntToIntEnum("ECA", status);
 }
@@ -1965,11 +1904,9 @@ static PyObject *Py_ca_poll(PyObject *self, PyObject *args)
 {
     int status;
 
-    checkExceptionCallback();
     Py_BEGIN_ALLOW_THREADS
     status = ca_poll();
     Py_END_ALLOW_THREADS
-    checkExceptionCallback();
 
     return IntToIntEnum("ECA", status);
 }
@@ -1978,11 +1915,9 @@ static PyObject *Py_ca_test_io(PyObject *self, PyObject *args)
 {
     int status;
 
-    checkExceptionCallback();
     Py_BEGIN_ALLOW_THREADS
     status = ca_test_io();
     Py_END_ALLOW_THREADS
-    checkExceptionCallback();
 
     return IntToIntEnum("ECA", status);
 }
@@ -1995,7 +1930,6 @@ static PyObject *Py_ca_test_io(PyObject *self, PyObject *args)
 static PyObject *Py_ca_field_type(PyObject *self, PyObject *args)
 {
     PyObject *pChid;
-    checkExceptionCallback();
     if(!PyArg_ParseTuple(args, "O", &pChid))
         return NULL;
 
@@ -2007,7 +1941,6 @@ static PyObject *Py_ca_field_type(PyObject *self, PyObject *args)
     Py_BEGIN_ALLOW_THREADS
     field_type = ca_field_type(chid);
     Py_END_ALLOW_THREADS
-    checkExceptionCallback();
 
     return IntToIntEnum("DBF", field_type);
 }
@@ -2015,7 +1948,6 @@ static PyObject *Py_ca_field_type(PyObject *self, PyObject *args)
 static PyObject *Py_ca_element_count(PyObject *self, PyObject *args)
 {
     PyObject *pChid;
-    checkExceptionCallback();
     if(!PyArg_ParseTuple(args, "O", &pChid))
         return NULL;
 
@@ -2028,14 +1960,12 @@ static PyObject *Py_ca_element_count(PyObject *self, PyObject *args)
     element_count = ca_element_count(chid);
     Py_END_ALLOW_THREADS
 
-    checkExceptionCallback();
     return Py_BuildValue("k", element_count);
 }
 
 static PyObject *Py_ca_name(PyObject *self, PyObject *args)
 {
     PyObject *pChid;
-    checkExceptionCallback();
     if(!PyArg_ParseTuple(args, "O", &pChid))
         return NULL;
 
@@ -2047,7 +1977,6 @@ static PyObject *Py_ca_name(PyObject *self, PyObject *args)
     Py_BEGIN_ALLOW_THREADS
     name = ca_name(chid);
     Py_END_ALLOW_THREADS
-    checkExceptionCallback();
 
     return CharToPyStringOrBytes(name);
 }
@@ -2055,7 +1984,6 @@ static PyObject *Py_ca_name(PyObject *self, PyObject *args)
 static PyObject *Py_ca_state(PyObject *self, PyObject *args)
 {
     PyObject *pChid;
-    checkExceptionCallback();
     if(!PyArg_ParseTuple(args, "O", &pChid))
         return NULL;
 
@@ -2071,14 +1999,12 @@ static PyObject *Py_ca_state(PyObject *self, PyObject *args)
     Py_BEGIN_ALLOW_THREADS
     state = ca_state(chid);
     Py_END_ALLOW_THREADS
-    checkExceptionCallback();
 
     return IntToIntEnum("ChannelState", state);
 }
 static PyObject *Py_ca_host_name(PyObject *self, PyObject *args)
 {
     PyObject *pChid;
-    checkExceptionCallback();
     if(!PyArg_ParseTuple(args, "O", &pChid))
         return NULL;
 
@@ -2090,7 +2016,6 @@ static PyObject *Py_ca_host_name(PyObject *self, PyObject *args)
     Py_BEGIN_ALLOW_THREADS
     host = ca_host_name(chid);
     Py_END_ALLOW_THREADS
-    checkExceptionCallback();
 
     return CharToPyStringOrBytes(host);
 }
@@ -2098,7 +2023,6 @@ static PyObject *Py_ca_host_name(PyObject *self, PyObject *args)
 static PyObject *Py_ca_read_access(PyObject *self, PyObject *args)
 {
     PyObject *pChid;
-    checkExceptionCallback();
     if(!PyArg_ParseTuple(args, "O", &pChid))
         return NULL;
 
@@ -2110,7 +2034,6 @@ static PyObject *Py_ca_read_access(PyObject *self, PyObject *args)
     Py_BEGIN_ALLOW_THREADS
     access = ca_read_access(chid);
     Py_END_ALLOW_THREADS
-    checkExceptionCallback();
 
     return PyBool_FromLong(access);
 }
@@ -2118,7 +2041,6 @@ static PyObject *Py_ca_read_access(PyObject *self, PyObject *args)
 static PyObject *Py_ca_write_access(PyObject *self, PyObject *args)
 {
     PyObject *pChid;
-    checkExceptionCallback();
     if(!PyArg_ParseTuple(args, "O", &pChid))
         return NULL;
 
@@ -2131,7 +2053,6 @@ static PyObject *Py_ca_write_access(PyObject *self, PyObject *args)
     access = ca_write_access(chid);
     Py_END_ALLOW_THREADS
 
-    checkExceptionCallback();
     return PyBool_FromLong(access);
 }
 

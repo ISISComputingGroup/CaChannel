@@ -20,6 +20,7 @@ else:
 import CaChannel as PACKAGE
 from . import ca
 
+
 class CaChannelException(Exception):
     def __init__(self, status):
         self.status = status
@@ -70,7 +71,7 @@ class CaChannel(object):
     __context_dict = {}
 
     ca_timeout = 3.0
-    
+
     # create a unique thread id, on all platforms on interest python "ident"
     # and "native_id" are the same
     @staticmethod
@@ -79,7 +80,7 @@ class CaChannel(object):
 
     # try to reuse CA contexts from threads that are no longer running. The epics CA library
     # creates a background thread to do callbacks and other work which can get lefr running as
-    # when the thread that created the CaChannel object terminates it does not destroy the 
+    # when the thread that created the CaChannel object terminates it does not destroy the
     # thread context it created
     @staticmethod
     def create_context():
@@ -98,7 +99,7 @@ class CaChannel(object):
                 context = ca.current_context()
             CaChannel.__context_dict[current_thread_id] = context
         return context
-        
+
     # A wrapper to automatically attach to the CA context
     def attach_ca_context(func):
         @wraps(func)
@@ -107,7 +108,7 @@ class CaChannel(object):
                 ca.attach_context(CaChannel.__context.val)
             except AttributeError:
                 CaChannel.__context.val = CaChannel.create_context()
-                
+
             return func(*args, **kwargs)
 
         return wrapper
