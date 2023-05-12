@@ -4,6 +4,9 @@ based on `caffi.ca API <https://caffi.readthedocs.io/en/latest/api.html>`.
 """
 # python 2 -> 3 compatible layer
 from __future__ import print_function, absolute_import
+
+import threading
+
 from functools import wraps
 import itertools
 import numbers
@@ -61,20 +64,51 @@ class CaChannel(object):
     'Done'
     """
 
-    __context = None
+    __context = threading.local()
     __callbacks = {}
+
+    __context_lock = threading.Lock()
+    __context_dict = {}
 
     ca_timeout = 3.0
 
-    # A wrapper to automatically attach to default CA context
+    # create a unique thread id, on all platforms on interest python "ident"
+    # and "native_id" are the same
+    @staticmethod
+    def get_thread_id(thread):
+        return str(thread.native_id)
+
+    # try to reuse CA contexts from threads that are no longer running. The epics CA library
+    # creates a background thread to do callbacks and other work which can get lefr running as
+    # when the thread that created the CaChannel object terminates it does not destroy the
+    # thread context it created
+    @staticmethod
+    def create_context():
+        context = None
+        current_thread_id = CaChannel.get_thread_id(threading.current_thread())
+        with CaChannel.__context_lock:
+            active_thread_ids = [ CaChannel.get_thread_id(thread) for thread in threading.enumerate() ]
+            for k, v in CaChannel.__context_dict.items():
+                if k not in active_thread_ids:
+                    context = v
+                    del CaChannel.__context_dict[k]
+                    ca.attach_context(context)
+                    break
+            if context is None:
+                ca.create_context(True)
+                context = ca.current_context()
+            CaChannel.__context_dict[current_thread_id] = context
+        return context
+
+    # A wrapper to automatically attach to the CA context
     def attach_ca_context(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            if CaChannel.__context is None:
-                ca.create_context(True)
-                CaChannel.__context = ca.current_context()
-            else:
-                ca.attach_context(CaChannel.__context)
+            try:
+                ca.attach_context(CaChannel.__context.val)
+            except AttributeError:
+                CaChannel.__context.val = CaChannel.create_context()
+
             return func(*args, **kwargs)
 
         return wrapper
