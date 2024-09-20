@@ -17,6 +17,11 @@ try:
     from setuptools import setup, Extension
 except:
     from distutils.core import setup, Extension
+    
+import epicscorelibs.path
+import epicscorelibs.config
+import swig
+os.environ["PATH"] += os.pathsep + swig.BIN_DIR
 
 # python 2/3 compatible way to load module from file
 def load_module(name, location):
@@ -39,21 +44,9 @@ def paths_exist(paths):
 
 build_ca_ext=True
 # define EPICS base path and host arch
-EPICSBASE = os.environ.get("EPICS_BASE")
-HOSTARCH = os.environ.get("EPICS_HOST_ARCH")
-SHARED = os.environ.get("EPICS_SHARED")
-# guess from EPICS root environment variable
-if not EPICSBASE:
-    EPICSROOT = os.environ.get("EPICS")
-    if EPICSROOT:
-        EPICSBASE = os.path.join(EPICSROOT, 'base')
-
-if not EPICSBASE or not os.path.exists(EPICSBASE) or not HOSTARCH:
-    build_ca_ext = False
-    warnings.warn("""
-    !!! No valid EPICS_BASE, EPICS_HOST_ARCH environment variables are defined !!!
-    !!!                 Switch to caffi as backend                             !!!
-    """)
+EPICSBASE = epicscorelibs.path.base_path
+HOSTARCH = epicscorelibs.config.get_config_var("EPICS_HOST_ARCH")
+SHARED = epicscorelibs.config.get_config_var("EPICS_SHARED")
 
 
 def create_exension():
@@ -77,7 +70,7 @@ def create_exension():
             if not SHARED:
                 dlls = ['Com.dll', 'ca.dll']
                 for dll in dlls:
-                    dllpath = os.path.join(EPICSBASE, 'bin', HOSTARCH, dll)
+                    dllpath = os.path.join(epicscorelibs.path.lib_path, dll)
                     if not os.path.exists(dllpath):
                         static = True
                         break
@@ -115,7 +108,7 @@ def create_exension():
     elif UNAME.lower() == "darwin":
         CMPL = 'clang'
         if not SHARED:
-            extra_objects = [os.path.join(EPICSBASE, 'lib', HOSTARCH, 'lib%s.a' % lib) for lib in libraries]
+            extra_objects = [os.path.join(epicscorelibs.path.lib_path, 'lib%s.a' % lib) for lib in libraries]
             if paths_exist(extra_objects):
                 libraries = []
             else:
@@ -124,10 +117,10 @@ def create_exension():
     elif UNAME.lower() == "linux":
         CMPL = 'gcc'
         if not SHARED:
-            extra_objects = [os.path.join(EPICSBASE, 'lib', HOSTARCH, 'lib%s.a' % lib) for lib in libraries]
+            extra_objects = [os.path.join(epicscorelibs.path.lib_path, 'lib%s.a' % lib) for lib in libraries]
             if paths_exist(extra_objects):
                 libraries = ['rt']
-                if subprocess.call('nm %s | grep -q rl_' % os.path.join(EPICSBASE, 'lib', HOSTARCH, 'libCom.a'), shell=True) == 0:
+                if subprocess.call('nm %s | grep -q rl_' % os.path.join(epicscorelibs.path.lib_path, 'libCom.a'), shell=True) == 0:
                     libraries += ['readline']
             else:
                 extra_objects = []
@@ -136,10 +129,7 @@ def create_exension():
         print("Platform", UNAME, ARCH, " Not Supported")
         sys.exit(1)
 
-    include_dirs = [os.path.join(EPICSBASE, "include"),
-                    os.path.join(EPICSBASE, "include", "os", UNAME),
-                    os.path.join(EPICSBASE, "include", "compiler", CMPL),
-                    ]
+    include_dirs = [epicscorelibs.path.include_path]
 
     ca_module = Extension('CaChannel._ca',
                           sources=['src/CaChannel/_ca.cpp'],
@@ -150,10 +140,10 @@ def create_exension():
                           extra_link_args=lflags,
                           extra_objects=extra_objects,
                           libraries=libraries,
-                          library_dirs=[os.path.join(EPICSBASE, "lib", HOSTARCH)])
+                          library_dirs=[epicscorelibs.path.lib_path])
 
     if UNAME == "Linux" and SHARED:
-        ca_module.runtime_library_dirs = [os.path.join(EPICSBASE, "lib", HOSTARCH)]
+        ca_module.runtime_library_dirs = [epicscorelibs.path.lib_path]
 
     return [ca_module], dlls
 
@@ -168,6 +158,10 @@ else:
     ext_module = []
     package_data = []
     requirements = ['caffi']
+    
+
+requirements += ["epicscorelibs", "swig"]    
+
 
 setup(name="CaChannel",
       version=_version.__version__,
