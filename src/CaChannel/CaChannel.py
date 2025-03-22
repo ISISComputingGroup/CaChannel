@@ -66,6 +66,7 @@ class CaChannel(object):
 
     __context = threading.local()
     __callbacks = {}
+    __context_glob = None
 
     __context_lock = threading.Lock()
     __context_dict = {}
@@ -104,10 +105,15 @@ class CaChannel(object):
     def attach_ca_context(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            try:
-                ca.attach_context(CaChannel.__context.val)
-            except AttributeError:
-                CaChannel.__context.val = CaChannel.create_context()
+            if CaChannel.__context_glob is None:
+                ca.create_context(True)
+                CaChannel.__context_glob = ca.current_context()
+            else:
+                ca.attach_context(CaChannel.__context_glob)
+#            try:
+#                ca.attach_context(CaChannel.__context.val)
+#            except AttributeError:
+#                CaChannel.__context.val = CaChannel.create_context()
 
             return func(*args, **kwargs)
 
