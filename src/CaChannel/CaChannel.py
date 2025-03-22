@@ -87,13 +87,13 @@ class CaChannel(object):
         context = None
         current_thread_id = CaChannel.get_thread_id(threading.current_thread())
         with CaChannel.__context_lock:
-            active_thread_ids = [ CaChannel.get_thread_id(thread) for thread in threading.enumerate() ]
-            for k, v in CaChannel.__context_dict.items():
-                if k not in active_thread_ids:
-                    context = v
-                    del CaChannel.__context_dict[k]
-                    ca.attach_context(context)
-                    break
+#            active_thread_ids = [ CaChannel.get_thread_id(thread) for thread in threading.enumerate() ]
+#            for k, v in CaChannel.__context_dict.items():
+#                if k not in active_thread_ids:
+#                    context = v
+#                    del CaChannel.__context_dict[k]
+#                    ca.attach_context(context)
+#                    break
             if context is None:
                 ca.create_context(True)
                 context = ca.current_context()
