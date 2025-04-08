@@ -65,6 +65,7 @@ class CaChannel(object):
     """
 
     __context = threading.local()
+    __context_first = None
     __callbacks = {}
 
     __context_lock = threading.Lock()
@@ -95,9 +96,14 @@ class CaChannel(object):
                     ca.attach_context(context)
                     break
             if context is None:
-                ca.create_context(True)
-                context = ca.current_context()
+                if os.getenv("EPICS_CAS_INTF_ADDR_LIST") is None and __context_first is not None:
+                    context = __context_first
+                else:
+                    ca.create_context(True)
+                    context = ca.current_context()
             CaChannel.__context_dict[current_thread_id] = context
+            if __context_first is None:
+                __context_first = context
         return context
 
     # A wrapper to automatically attach to the CA context
