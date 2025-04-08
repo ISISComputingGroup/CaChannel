@@ -6,6 +6,7 @@ based on `caffi.ca API <https://caffi.readthedocs.io/en/latest/api.html>`.
 from __future__ import print_function, absolute_import
 
 import threading
+import os
 
 from functools import wraps
 import itertools
