@@ -86,25 +86,30 @@ class CaChannel(object):
     # thread context it created
     @staticmethod
     def create_context():
-        context = None
+        if CaChannel.__context_first is None:
+            passed_context = ca.current_context()
+            if passed_context is not None:
+                CaChannel.__context_first = passed_context
+            else:
+                ca.create_context(True)
+                CaChannel.__context_first = ca.current_context()
         current_thread_id = CaChannel.get_thread_id(threading.current_thread())
-        with CaChannel.__context_lock:
-            active_thread_ids = [ CaChannel.get_thread_id(thread) for thread in threading.enumerate() ]
-            for k, v in CaChannel.__context_dict.items():
-                if k not in active_thread_ids:
-                    context = v
-                    del CaChannel.__context_dict[k]
-                    ca.attach_context(context)
-                    break
-            if context is None:
-                if os.getenv("EPICS_CAS_INTF_ADDR_LIST") is None and CaChannel.__context_first is not None:
-                    context = CaChannel.__context_first
-                else:
+        context = None
+        if os.getenv("EPICS_CAS_INTF_ADDR_LIST") is None:
+            context = CaChannel.__context_first
+        else:
+            with CaChannel.__context_lock:
+                active_thread_ids = [ CaChannel.get_thread_id(thread) for thread in threading.enumerate() ]
+                for k, v in CaChannel.__context_dict.items():
+                    if k not in active_thread_ids:
+                        context = v
+                        del CaChannel.__context_dict[k]
+                        ca.attach_context(context)
+                        break
+                if context is None:
                     ca.create_context(True)
                     context = ca.current_context()
-            CaChannel.__context_dict[current_thread_id] = context
-            if CaChannel.__context_first is None:
-                CaChannel.__context_first = context
+        CaChannel.__context_dict[current_thread_id] = context
         return context
 
     # A wrapper to automatically attach to the CA context
