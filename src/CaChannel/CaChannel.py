@@ -85,9 +85,8 @@ class CaChannel(object):
     # when the thread that created the CaChannel object terminates it does not destroy the
     # thread context it created
     @staticmethod
-    def create_context():
+    def create_context(passed_context):
         if CaChannel.__context_first is None:
-            passed_context = ca.current_context()
             if passed_context is not None:
                 CaChannel.__context_first = passed_context
             else:
@@ -108,6 +107,7 @@ class CaChannel(object):
                 if context is None:
                     ca.create_context(True)
                     context = ca.current_context()
+        ca.detach_context()
         ca.attach_context(context)
         CaChannel.__context_dict[current_thread_id] = context
         return context
@@ -116,10 +116,12 @@ class CaChannel(object):
     def attach_ca_context(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
+            passed_context = ca.current_context()
+            ca.detach_context()
             try:
                 ca.attach_context(CaChannel.__context.val)
             except AttributeError:
-                CaChannel.__context.val = CaChannel.create_context()
+                CaChannel.__context.val = CaChannel.create_context(passed_context)
 
             return func(*args, **kwargs)
 
