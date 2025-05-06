@@ -104,11 +104,11 @@ class CaChannel(object):
                     if k not in active_thread_ids:
                         context = v
                         del CaChannel.__context_dict[k]
-                        ca.attach_context(context)
                         break
                 if context is None:
                     ca.create_context(True)
                     context = ca.current_context()
+        ca.attach_context(context)
         CaChannel.__context_dict[current_thread_id] = context
         return context
 
